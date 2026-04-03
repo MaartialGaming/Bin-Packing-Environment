@@ -10,3 +10,5 @@ if __name__ == '__main__':
     solver = solver_000000(inst)
 
     solver.solve()
+
+#aggiungo modifiche solo per capire il funzionamento di GH

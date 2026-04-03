@@ -9,3 +9,5 @@ results/*
 
 # But keep this specific file
 !results/.gitkeep
+.venv/bin/activate
+.venv/
