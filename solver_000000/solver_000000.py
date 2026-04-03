@@ -22,3 +22,4 @@ class solver_000000(AbstractSolver):
             self.idx_vehicle += 1
         
         self.write_solution_to_file()
+#cambiamento
