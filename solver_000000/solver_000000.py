@@ -1,5 +1,5 @@
-from solver_000000.abstract_solver import AbstractSolver
-from solver_000000.additional_script import AdditionalScript
+from .abstract_solver import AbstractSolver
+from .additional_script import AdditionalScript
 
 class solver_000000(AbstractSolver):
 
