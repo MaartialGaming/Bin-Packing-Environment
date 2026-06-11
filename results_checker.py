@@ -46,19 +46,61 @@ if __name__ == '__main__':
     # -------------------------
     # Prepare lookups
     # -------------------------
+    required_columns = {
+        "type_vehicle",
+        "idx_vehicle",
+        "id_item",
+        "x_origin",
+        "y_origin",
+        "z_origin",
+        "orient",
+    }
+
+    missing_columns = required_columns - set(solution.columns)
+    if missing_columns:
+        print(f"MISSING COLUMNS: {', '.join(sorted(missing_columns))}")
+        solution = solution.reindex(columns=list(required_columns))
+
+    numeric_columns = ["idx_vehicle", "x_origin", "y_origin", "z_origin", "orient"]
+    for col in numeric_columns:
+        solution[col] = pd.to_numeric(solution[col], errors="coerce")
+
     items_dict = items.to_dict("index")
     vehicles_dict = vehicles.to_dict("index")
 
     groups = solution.groupby("idx_vehicle")
 
     total_cost = 0
-    feasible = True
+    feasible = not missing_columns
     placed_item_ids = set()
 
     print("\n================ SOLUTION CHECK ================\n")
 
+    bad_numeric = solution[numeric_columns].isna().any(axis=1)
+    if bad_numeric.any():
+        print(f"INVALID NUMERIC VALUES in rows: {bad_numeric[bad_numeric].index.tolist()}")
+        feasible = False
+
+    vehicle_indices = sorted(solution["idx_vehicle"].dropna().unique())
+    expected_indices = list(range(len(vehicle_indices)))
+    if vehicle_indices and vehicle_indices != expected_indices:
+        print(f"NON-CONSECUTIVE VEHICLE INDICES: {vehicle_indices}")
+        feasible = False
+
     for vidx, group in groups:
         vehicle_type = group.iloc[0]['type_vehicle']
+        if group["type_vehicle"].nunique(dropna=False) != 1:
+            print(f"\nVehicle {vidx}:")
+            print("MIXED VEHICLE TYPES")
+            feasible = False
+            continue
+
+        if vehicle_type not in vehicles_dict:
+            print(f"\nVehicle {vidx}:")
+            print(f"UNKNOWN VEHICLE TYPE: {vehicle_type}")
+            feasible = False
+            continue
+
         vehicle = vehicles_dict[vehicle_type]
 
         vehicle_ok = True
@@ -70,10 +112,28 @@ if __name__ == '__main__':
 
         for _, row in group.iterrows():
             item_id = row["id_item"]
+            if item_id in placed_item_ids:
+                print(f"DUPLICATE ITEM: {item_id}")
+                vehicle_ok = False
             placed_item_ids.add(item_id)
+
+            if item_id not in items_dict:
+                print(f"UNKNOWN ITEM: {item_id}")
+                vehicle_ok = False
+                continue
+
             item = items_dict[item_id]
 
             orient = int(row["orient"])
+            if orient < 0 or orient > 5:
+                print(f"INVALID ORIENTATION: {item_id} orient={orient}")
+                vehicle_ok = False
+                continue
+
+            if str(orient) not in str(item["allowedRotations"]):
+                print(f"FORBIDDEN ROTATION: {item_id} orient={orient}, allowed={item['allowedRotations']}")
+                vehicle_ok = False
+
             w, d, h = get_dims(item, orient)
 
             x, y, z = row["x_origin"], row["y_origin"], row["z_origin"]
@@ -88,7 +148,10 @@ if __name__ == '__main__':
             # -------------------------
             # Bounds
             # -------------------------
-            if box["x2"] > vehicle["depth"] or \
+            if box["x1"] < 0 or \
+            box["y1"] < 0 or \
+            box["z1"] < 0 or \
+            box["x2"] > vehicle["depth"] or \
             box["y2"] > vehicle["width"] or \
             box["z2"] > vehicle["height"]:
                 print(f"\nVehicle {vidx} ({vehicle_type}):")
@@ -172,6 +235,6 @@ if __name__ == '__main__':
     print(f"Total cost: {total_cost:.2f}")
 
     if feasible:
-        print("✅ FEASIBLE solution")
+        print("FEASIBLE solution")
     else:
-        print("❌ INFEASIBLE solution")
+        print("INFEASIBLE solution")
